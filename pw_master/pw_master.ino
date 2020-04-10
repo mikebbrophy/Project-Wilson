@@ -26,8 +26,14 @@ DallasTemperature sensorsAir(&oneWireAir);
 DallasTemperature sensorsWater(&oneWireWater);
 
 void setup() {
+  pinMode(8, OUTPUT);
+  pinMode(9, OUTPUT);
+  digitalWrite(8, HIGH);
+  digitalWrite(9, HIGH);  
+  
   // put your setup code here, to run once:
   Serial.begin(9600);
+  Serial.println("STARTING UP...");
   sensorsAir.begin();
   sensorsWater.begin();
 
@@ -40,7 +46,8 @@ void setup() {
  
 }
 
-void loop() {
+void loop() { 
+  
   //***** READ PHOTOCELL
   Serial.print("photocell: ");
   printLight();
@@ -77,6 +84,7 @@ void printTemperature(DeviceAddress deviceAddress, DallasTemperature sensorsAddr
   }
   Serial.print(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
   Serial.println("F");
+  tempC = 0;
 }
 
 void printHumidity() 
