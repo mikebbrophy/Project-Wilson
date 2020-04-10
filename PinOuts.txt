@@ -1,0 +1,1 @@
+DB1920 Temp Sensor => pins 4,5
