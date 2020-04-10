@@ -1,10 +1,11 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <SHT1x.h>
 
 //Globals
 //***** PHOTOCELL *****
 int sensorPin = A1;    // select the input pin for the potentiometer
-float sensorValue = 0; // variable to store the value coming from the sensor
+double sensorValue = -1; // variable to store the value coming from the sensor
 
 //***** AIR TEMP SENSOR *****
 #define AIRTEMP_BUS 4
@@ -15,6 +16,11 @@ DeviceAddress airThermometer;
 #define WATERTEMP_BUS 5
 OneWire oneWireWater(WATERTEMP_BUS);
 DeviceAddress waterThermometer;
+
+//***** HUMID SENSOR *****
+#define dataPin A2
+#define sckPin A3 //serial clock
+SHT1x th_sensor(dataPin, sckPin);
 
 DallasTemperature sensorsAir(&oneWireAir);
 DallasTemperature sensorsWater(&oneWireWater);
@@ -31,71 +37,52 @@ void setup() {
   //***** INITIALIZE AIR TEMP SENSOR *****
   sensorsAir.setResolution(airThermometer, 9);
   sensorsWater.setResolution(waterThermometer, 9);
-  
-
+ 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
   //***** READ PHOTOCELL
-  sensorValue = analogRead(sensorPin);
   Serial.print("photocell: ");
-  Serial.println(sensorValue);
-  delay(500);
+  printLight();
 
   //***** READ AIR AND WATER TEMP SENSORS
-  sensorsAir.requestTemperatures(); // Send the command to get temperatures
-  float airtempC = sensorsAir.getTempC(airThermometer);
-  sensorsWater.requestTemperatures(); // Send the command to get temperatures
-  float watertempC = sensorsWater.getTempC(waterThermometer);
-
   Serial.print("airtemp: ");
-  printAirTemperature(airThermometer);
+  printTemperature(airThermometer, sensorsAir);
   Serial.print("watertemp: ");
-  printWaterTemperature(waterThermometer);
+  printTemperature(waterThermometer, sensorsWater);
 
-  delay(2000);
+  //***** READ HUMIDITY SENSOR *****
+  Serial.print("humidity: ");
+  printHumidity();
+  Serial.println();
+
+  delay(3000);
 }
 
-void printAirTemperature(DeviceAddress deviceAddress)
+void printLight()
 {
-  // method 1 - slower
-  //Serial.print("Temp C: ");
-  //Serial.print(sensorsAir.getTempC(deviceAddress));
-  //Serial.print(" Temp F: ");
-  //Serial.print(sensorsAir.getTempF(deviceAddress)); // Makes a second call to getTempC and then converts to Fahrenheit
+  sensorValue = analogRead(sensorPin);
+  Serial.print(sensorValue*100/1024);
+  Serial.println("%");
+}
 
-  // method 2 - faster
-  float tempC = sensorsAir.getTempC(deviceAddress);
+void printTemperature(DeviceAddress deviceAddress, DallasTemperature sensorsAddress)
+{
+  sensorsAddress.requestTemperatures(); // Send the command to get temperatures
+  float tempC = sensorsAddress.getTempC(deviceAddress);
   if(tempC == DEVICE_DISCONNECTED_C) 
   {
     Serial.println("Error: Could not read temperature data");
     return;
   }
-  Serial.print("Temp C: ");
-  Serial.print(tempC);
-  Serial.print(" Temp F: ");
-  Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
+  Serial.print(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
+  Serial.println("F");
 }
 
-void printWaterTemperature(DeviceAddress deviceAddress)
+void printHumidity() 
 {
-  // method 1 - slower
-  //Serial.print("Temp C: ");
-  //Serial.print(sensorsAir.getTempC(deviceAddress));
-  //Serial.print(" Temp F: ");
-  //Serial.print(sensorsAir.getTempF(deviceAddress)); // Makes a second call to getTempC and then converts to Fahrenheit
-
-  // method 2 - faster
-  float tempC = sensorsWater.getTempC(deviceAddress);
-  if(tempC == DEVICE_DISCONNECTED_C) 
-  {
-    Serial.println("Error: Could not read temperature data");
-    return;
-  }
-  Serial.print("Temp C: ");
-  Serial.print(tempC);
-  Serial.print(" Temp F: ");
-  Serial.println(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
+  float humid;
+  humid = th_sensor.readHumidity();
+  Serial.print(humid);
+  Serial.println("%");
 }
