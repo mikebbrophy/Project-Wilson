@@ -5,40 +5,46 @@
 #include <SoftwareSerial.h>
 
 //Globals
-//***** PHOTOCELL *****
-int sensorPin = A1;    // select the input pin for the potentiometer
-double sensorValue = -1; // variable to store the value coming from the sensor
-uint32_t timer = millis();
+  //***** PHOTOCELL *****
+  int sensorPin = A1;    // select the input pin for the potentiometer
+  double sensorValue = -1; // variable to store the value coming from the sensor
+  
+  //***** AIR TEMP SENSOR *****
+  #define AIRTEMP_BUS 4
+  OneWire oneWireAir(AIRTEMP_BUS);
+  DeviceAddress airThermometer;
+  DallasTemperature sensorsAir(&oneWireAir);
+  
+  //***** WATER TEMP SENSOR *****
+  #define WATERTEMP_BUS 5
+  OneWire oneWireWater(WATERTEMP_BUS);
+  DeviceAddress waterThermometer;
+  DallasTemperature sensorsWater(&oneWireWater);
+  
+  
+  //***** HUMID SENSOR *****
+  #define dataPin A2
+  #define sckPin A3 //serial clock
+  SHT1x th_sensor(dataPin, sckPin);
+  
+  //***** GPS *****
+  SoftwareSerial mySerial(3, 2);
+  Adafruit_GPS GPS(&mySerial);
+  #define GPSECHO  true
 
-//***** AIR TEMP SENSOR *****
-#define AIRTEMP_BUS 4
-OneWire oneWireAir(AIRTEMP_BUS);
-DeviceAddress airThermometer;
-DallasTemperature sensorsAir(&oneWireAir);
+  char uplinkPayload[80] = { };
 
-//***** WATER TEMP SENSOR *****
-#define WATERTEMP_BUS 5
-OneWire oneWireWater(WATERTEMP_BUS);
-DeviceAddress waterThermometer;
-DallasTemperature sensorsWater(&oneWireWater);
-
-
-//***** HUMID SENSOR *****
-#define dataPin A2
-#define sckPin A3 //serial clock
-SHT1x th_sensor(dataPin, sckPin);
-
-//***** GPS *****
-SoftwareSerial mySerial(3, 2);
-Adafruit_GPS GPS(&mySerial);
-#define GPSECHO  true
+  float photocell_f;
+  float airTemp_f;
+  float waterTemp_f;
+  float humidity_f;
 
 void setup() {
   //***** INITIALIZE MOSFET *****
   pinMode(8, OUTPUT);
   pinMode(9, OUTPUT);
-  digitalWrite(8, HIGH);
-  digitalWrite(9, HIGH);  
+  digitalWrite(8, LOW); //Iridium MOSFET
+  digitalWrite(9, HIGH);  //GPS + Sensor Array MOSFET
   
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -70,29 +76,33 @@ void loop()
    
   //***** READ PHOTOCELL
   Serial.print("photocell: ");
-  printLight();
-
+  photocell_f = printLight();
+  
   //***** READ AIR AND WATER TEMP SENSORS
   Serial.print("airtemp: ");
-  printTemperature(airThermometer, sensorsAir);
+  airTemp_f = printTemperature(airThermometer, sensorsAir);
   Serial.print("watertemp: ");
-  printTemperature(waterThermometer, sensorsWater);
+  waterTemp_f = printTemperature(waterThermometer, sensorsWater);
 
   //***** READ HUMIDITY SENSOR *****
   Serial.print("humidity: ");
-  printHumidity();
+  humidity_f = printHumidity();
   Serial.println();
 
   //***** READ GPS *****
   printGPS();
+  
   delay(10000);
 }
 
 void printGPS() {
   boolean fixAcq = false;
-
-  while(!fixAcq) {
-    char c = GPS.read();
+  uint32_t timer = millis();
+  while (!fixAcq) {
+    if (millis() - timer > 15000) {
+      Serial.println("\n\n-------------------GPS TIMEOUT--------------------\n\n");
+      return;
+    }
     GPS.parse(GPS.lastNMEA());
     if(GPS.fix) {
       Serial.print("Time: ");
@@ -105,19 +115,23 @@ void printGPS() {
       Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
       Serial.println();
       fixAcq = true;
+      return;
     }  
   }
   
 }
 
-void printLight()
+float printLight()
 {
   sensorValue = analogRead(sensorPin);
+  photocell_f = sensorValue;
   Serial.print(sensorValue*100/1024);
   Serial.println("%");
+
+  return (sensorValue*100/1024);
 }
 
-void printTemperature(DeviceAddress deviceAddress, DallasTemperature sensorsAddress)
+float printTemperature(DeviceAddress deviceAddress, DallasTemperature sensorsAddress)
 {
   sensorsAddress.requestTemperatures(); // Send the command to get temperatures
   float tempC = sensorsAddress.getTempC(deviceAddress);
@@ -128,13 +142,14 @@ void printTemperature(DeviceAddress deviceAddress, DallasTemperature sensorsAddr
   }
   Serial.print(DallasTemperature::toFahrenheit(tempC)); // Converts tempC to Fahrenheit
   Serial.println("F");
-  tempC = 0;
+  return DallasTemperature::toFahrenheit(tempC);
 }
 
-void printHumidity() 
+float printHumidity() 
 {
   float humid;
   humid = th_sensor.readHumidity();
   Serial.print(humid);
   Serial.println("%");
+  return humid;
 }
